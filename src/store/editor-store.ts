@@ -39,6 +39,7 @@ interface EditorStore {
   zoomPunches: boolean;
   beatSync: boolean;
   silenceRemoval: boolean;
+  includeReferenceInRemix: boolean;
 
   // Render
   isExporting: boolean;
@@ -65,6 +66,7 @@ interface EditorStore {
   setZoomPunches: (b: boolean) => void;
   setBeatSync: (b: boolean) => void;
   setSilenceRemoval: (b: boolean) => void;
+  setIncludeReferenceInRemix: (b: boolean) => void;
   setIsExporting: (b: boolean) => void;
   setExportProgress: (p: number) => void;
   reset: () => void;
@@ -90,6 +92,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   zoomPunches: true,
   beatSync: true,
   silenceRemoval: false,
+  includeReferenceInRemix: false,
   isExporting: false,
   exportProgress: 0,
 
@@ -116,6 +119,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   setZoomPunches: (b) => set({ zoomPunches: b }),
   setBeatSync: (b) => set({ beatSync: b }),
   setSilenceRemoval: (b) => set({ silenceRemoval: b }),
+  setIncludeReferenceInRemix: (b) => set({ includeReferenceInRemix: b }),
   setIsExporting: (b) => set({ isExporting: b }),
   setExportProgress: (p) => set({ exportProgress: p }),
   reset: () =>

@@ -36,6 +36,8 @@ export function Inspector() {
   const setZoomPunches = useEditorStore((s) => s.setZoomPunches);
   const beatSync = useEditorStore((s) => s.beatSync);
   const setBeatSync = useEditorStore((s) => s.setBeatSync);
+  const includeReferenceInRemix = useEditorStore((s) => s.includeReferenceInRemix);
+  const setIncludeReferenceInRemix = useEditorStore((s) => s.setIncludeReferenceInRemix);
 
   const [tab, setTab] = useState<TabId>('edit');
 
@@ -96,6 +98,8 @@ export function Inspector() {
             setZoomPunches={setZoomPunches}
             beatSync={beatSync}
             setBeatSync={setBeatSync}
+            includeReferenceInRemix={includeReferenceInRemix}
+            setIncludeReferenceInRemix={setIncludeReferenceInRemix}
             bpm={styleSignature?.bpm || 0}
           />
         )}
@@ -250,6 +254,8 @@ function AITab({
   setZoomPunches,
   beatSync,
   setBeatSync,
+  includeReferenceInRemix,
+  setIncludeReferenceInRemix,
   bpm,
 }: any) {
   return (
@@ -266,6 +272,12 @@ function AITab({
         <ToggleRow label="Beat sync" desc="Cut on every detected beat" checked={beatSync} onChange={setBeatSync} />
         <ToggleRow label="Zoom punches" desc="Punch-in on the beat" checked={zoomPunches} onChange={setZoomPunches} />
         <ToggleRow label="Captions" desc="Add kinetic-style subtitles" checked={enableCaptions} onChange={setEnableCaptions} />
+        <ToggleRow
+          label="Include reference in remix"
+          desc="Also use the reference clip as a source"
+          checked={includeReferenceInRemix}
+          onChange={setIncludeReferenceInRemix}
+        />
       </div>
 
       {enableCaptions && (

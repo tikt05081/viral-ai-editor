@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 
 export function AIControlsBar() {
   const userClips = useEditorStore((s) => s.userClips);
+  const referenceClip = useEditorStore((s) => s.referenceClip);
   const styleSignature = useEditorStore((s) => s.styleSignature);
   const refBeats = useEditorStore((s) => s.refBeats);
   const refVisuals = useEditorStore((s) => s.refVisuals);
@@ -22,6 +23,7 @@ export function AIControlsBar() {
   const enableCaptions = useEditorStore((s) => s.enableCaptions);
   const zoomPunches = useEditorStore((s) => s.zoomPunches);
   const beatSync = useEditorStore((s) => s.beatSync);
+  const includeReferenceInRemix = useEditorStore((s) => s.includeReferenceInRemix);
   const isExporting = useEditorStore((s) => s.isExporting);
   const setIsExporting = useEditorStore((s) => s.setIsExporting);
   const setExportProgress = useEditorStore((s) => s.setExportProgress);
@@ -51,8 +53,17 @@ export function AIControlsBar() {
         rawTranscript: '',
         source: 'energy' as const,
       };
+      // Filter out the reference clip unless user explicitly wants it included
+      const sourceClips = includeReferenceInRemix
+        ? userClips
+        : userClips.filter((c) => c.id !== referenceClip?.id);
+      if (sourceClips.length === 0) {
+        toast.error('Add at least one clip besides the reference, or enable "Include reference in remix"');
+        setGenerating(false);
+        return;
+      }
       const newSegments = generateAutoEdit({
-        userClips,
+        userClips: sourceClips,
         style: styleSignature,
         beats: refBeats,
         visuals: refVisuals,
