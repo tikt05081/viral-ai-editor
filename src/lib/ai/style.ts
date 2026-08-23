@@ -27,7 +27,7 @@ export async function analyzeVideoStyle(
   callbacks: AnalysisCallbacks = {}
 ): Promise<FullAnalysis> {
   callbacks.onProgress?.('Detecting beats…', 0.1);
-  const beats = await analyzeBeats(audio);
+  const beats = await analyzeBeats(audio, frames);
 
   callbacks.onProgress?.('Analyzing motion…', 0.35);
   const visuals = analyzeVisuals(frames);

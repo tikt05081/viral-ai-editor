@@ -52,7 +52,7 @@ export default function EditorPage() {
       </header>
 
       {/* Main content */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* Left panel */}
         <aside className="w-80 shrink-0 border-r border-border/40 flex flex-col p-4 gap-3 overflow-y-auto">
           {mounted && styleSignature ? (
@@ -66,9 +66,11 @@ export default function EditorPage() {
         </aside>
 
         {/* Center: Preview + Timeline */}
-        <main className="flex-1 flex flex-col min-w-0">
-          <Preview className="flex-1" />
-          <Timeline />
+        <main className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+          <Preview className="flex-1 min-h-0" />
+          <div className="shrink-0 max-h-[200px]">
+            <Timeline />
+          </div>
         </main>
 
         {/* Right panel: AI controls */}

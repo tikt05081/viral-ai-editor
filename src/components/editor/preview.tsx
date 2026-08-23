@@ -288,11 +288,11 @@ export function Preview({ className }: PreviewProps) {
   }
 
   return (
-    <div className={cn('flex flex-col h-full', className)}>
-      <div className="flex-1 flex items-center justify-center p-6 min-h-0">
+    <div className={cn('flex flex-col h-full min-h-0', className)}>
+      <div className="flex-1 flex items-center justify-center p-4 min-h-0 overflow-hidden">
         <div
           className="relative rounded-3xl overflow-hidden apple-shadow-lg bg-black"
-          style={{ aspectRatio, height: '100%', maxHeight: '100%' }}
+          style={{ aspectRatio, height: '100%', maxHeight: '100%', maxWidth: '100%' }}
         >
           <canvas
             ref={canvasRef}
@@ -302,8 +302,9 @@ export function Preview({ className }: PreviewProps) {
           />
           {segments.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="text-center text-white/60">
-                <p className="text-sm">Add clips and generate an edit</p>
+              <div className="text-center text-white/60 px-6">
+                <p className="text-base font-medium mb-1">Ready when you are</p>
+                <p className="text-xs opacity-70">Click "Generate Edit" to start</p>
               </div>
             </div>
           )}
