@@ -288,10 +288,10 @@ export function Preview({ className }: PreviewProps) {
   }
 
   return (
-    <div className={cn('flex flex-col h-full min-h-0', className)}>
+    <div className={cn('flex flex-col h-full min-h-0 bg-[#0a0a0b]', className)}>
       <div className="flex-1 flex items-center justify-center p-4 min-h-0 overflow-hidden">
         <div
-          className="relative rounded-3xl overflow-hidden apple-shadow-lg bg-black"
+          className="relative rounded-2xl overflow-hidden border border-white/5 bg-black apple-shadow-lg"
           style={{ aspectRatio, height: '100%', maxHeight: '100%', maxWidth: '100%' }}
         >
           <canvas
@@ -302,9 +302,9 @@ export function Preview({ className }: PreviewProps) {
           />
           {segments.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="text-center text-white/60 px-6">
-                <p className="text-base font-medium mb-1">Ready when you are</p>
-                <p className="text-xs opacity-70">Click "Generate Edit" to start</p>
+              <div className="text-center text-white/40 px-6">
+                <p className="text-sm font-medium mb-1">Ready when you are</p>
+                <p className="text-xs opacity-70">Click "Generate Edit" in the bottom bar</p>
               </div>
             </div>
           )}
@@ -312,46 +312,46 @@ export function Preview({ className }: PreviewProps) {
       </div>
 
       {/* Transport controls */}
-      <div className="border-t border-border/40 bg-background/80 backdrop-blur-xl px-6 py-3">
-        <div className="flex items-center gap-3">
+      <div className="border-t border-white/5 bg-black/30 backdrop-blur-xl px-4 py-2">
+        <div className="flex items-center gap-2">
           <Button
             variant="ghost"
-            size="icon"
+            size="icon-sm"
             onClick={() => {
               setCurrentTime(0);
               setIsPlaying(false);
             }}
           >
-            <RotateCcw className="h-4 w-4" />
+            <RotateCcw className="h-3.5 w-3.5" />
           </Button>
           <Button
             variant="default"
-            size="icon"
+            size="icon-sm"
             onClick={() => {
               if (segments.length === 0) return;
               setIsPlaying(!isPlaying);
             }}
             disabled={segments.length === 0}
-            className="rounded-full"
+            className="rounded-full bg-white text-black hover:bg-white/90"
           >
-            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+            {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 ml-0.5" />}
           </Button>
-          <div className="font-mono text-xs text-muted-foreground tabular-nums w-24">
+          <div className="font-mono text-[11px] text-muted-foreground tabular-nums w-20">
             {formatTime(currentTime, true)} / {formatTime(timelineDuration)}
           </div>
           <div
-            className="flex-1 h-1.5 rounded-full bg-muted cursor-pointer overflow-hidden"
+            className="flex-1 h-1 rounded-full bg-white/10 cursor-pointer overflow-hidden"
             onClick={handleSeekClick}
           >
             <div
-              className="h-full bg-foreground transition-all"
+              className="h-full bg-white transition-all"
               style={{ width: `${timelineDuration > 0 ? (currentTime / timelineDuration) * 100 : 0}%` }}
             />
           </div>
           <Button variant="ghost" size="icon-sm" onClick={() => setMuted(!muted)}>
-            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
           </Button>
-          <div className="w-20">
+          <div className="w-16">
             <Slider
               min={0}
               max={1}

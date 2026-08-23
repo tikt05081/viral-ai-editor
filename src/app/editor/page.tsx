@@ -3,18 +3,21 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Sparkles } from 'lucide-react';
+import { ArrowLeft, Sparkles, Download, Settings, Wand2 } from 'lucide-react';
 import { useEditorStore } from '@/store/editor-store';
 import { Preview } from '@/components/editor/preview';
 import { Timeline } from '@/components/editor/timeline';
-import { AIControls } from '@/components/editor/ai-controls';
-import { StyleCard } from '@/components/editor/style-card';
-import { ClipsLibrary } from '@/components/editor/clips-library';
+import { MediaLibrary } from '@/components/editor/media-library';
+import { Inspector } from '@/components/editor/inspector';
+import { AIControlsBar } from '@/components/editor/ai-controls-bar';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { toast } from 'sonner';
 
 export default function EditorPage() {
   const styleSignature = useEditorStore((s) => s.styleSignature);
   const userClips = useEditorStore((s) => s.userClips);
+  const segments = useEditorStore((s) => s.segments);
+  const isExporting = useEditorStore((s) => s.isExporting);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -22,85 +25,53 @@ export default function EditorPage() {
   }, []);
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
-      {/* Top bar */}
-      <header className="h-14 shrink-0 border-b border-border/40 glass-strong flex items-center justify-between px-4 z-10">
-        <div className="flex items-center gap-3">
+    <div className="h-screen flex flex-col bg-[#0a0a0b] text-foreground overflow-hidden">
+      {/* Top bar — minimal, like Palmier */}
+      <header className="h-12 shrink-0 border-b border-white/5 bg-black/40 backdrop-blur-xl flex items-center justify-between px-4 z-10">
+        <div className="flex items-center gap-4">
           <Link
             href="/"
-            className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            className="h-7 w-7 rounded-md hover:bg-white/5 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-3.5 w-3.5" />
           </Link>
           <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-md gradient-viral flex items-center justify-center">
-              <Sparkles className="h-3 w-3 text-white" />
+            <div className="h-5 w-5 rounded gradient-viral flex items-center justify-center">
+              <Sparkles className="h-2.5 w-2.5 text-white" />
             </div>
-            <span className="font-semibold text-sm tracking-tight">Viral AI Editor</span>
+            <span className="font-medium text-sm tracking-tight">Viral AI</span>
+            {mounted && styleSignature && (
+              <>
+                <span className="text-white/20">/</span>
+                <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                  {styleSignature.bpm || '—'} BPM · {styleSignature.cutsPerMinute.toFixed(0)} cuts/min
+                </span>
+              </>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {mounted && styleSignature && (
-            <div className="text-xs text-muted-foreground hidden md:flex items-center gap-3">
-              <span><b className="text-foreground">{styleSignature.bpm || '—'}</b> BPM</span>
-              <span className="opacity-50">·</span>
-              <span><b className="text-foreground">{userClips.length}</b> clips</span>
-            </div>
-          )}
+        <div className="flex items-center gap-1">
           <ThemeToggle />
         </div>
       </header>
 
-      {/* Main content */}
-      <div className="flex-1 flex min-h-0 overflow-hidden">
-        {/* Left panel */}
-        <aside className="w-80 shrink-0 border-r border-border/40 flex flex-col p-4 gap-3 overflow-y-auto">
-          {mounted && styleSignature ? (
-            <>
-              <StyleCard />
-              <ClipsLibrary />
-            </>
-          ) : (
-            <EmptyLeftState />
-          )}
-        </aside>
+      {/* Main 3-column layout: media | preview+timeline | inspector */}
+      <div className="flex-1 flex min-h-0">
+        {/* Left: Media library (collapsible) */}
+        <MediaLibrary />
 
         {/* Center: Preview + Timeline */}
-        <main className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+        <main className="flex-1 flex flex-col min-w-0 min-h-0 bg-[#0a0a0b]">
           <Preview className="flex-1 min-h-0" />
-          <div className="shrink-0 max-h-[200px]">
-            <Timeline />
-          </div>
+          <Timeline />
         </main>
 
-        {/* Right panel: AI controls */}
-        <aside className="w-80 shrink-0 border-l border-border/40 p-4 overflow-y-auto">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 px-1">
-            AI Editor
-          </h3>
-          <AIControls />
-        </aside>
+        {/* Right: Inspector */}
+        <Inspector />
       </div>
-    </div>
-  );
-}
 
-function EmptyLeftState() {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
-      <div className="h-12 w-12 rounded-2xl bg-muted flex items-center justify-center mb-3">
-        <Sparkles className="h-5 w-5 text-muted-foreground" />
-      </div>
-      <h3 className="font-semibold mb-1">No reference yet</h3>
-      <p className="text-sm text-muted-foreground mb-4">
-        Go back and paste a TikTok URL or upload a reference video.
-      </p>
-      <Link
-        href="/"
-        className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
-      >
-        ← Back to home
-      </Link>
+      {/* Bottom AI bar — Palmier-style "agents help with the first pass" */}
+      <AIControlsBar />
     </div>
   );
 }
