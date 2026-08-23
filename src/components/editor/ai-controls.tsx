@@ -1,0 +1,289 @@
+'use client';
+
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Sparkles, Wand2, Download, Loader2, Zap, Music, Type, Palette, Scissors } from 'lucide-react';
+import { useEditorStore } from '@/store/editor-store';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
+import { generateAutoEdit } from '@/lib/ai/auto-edit';
+import { COLOR_PRESETS } from '@/lib/ai/color-presets';
+import { CAPTION_PRESETS } from '@/lib/ai/captions';
+import { exportProject } from '@/lib/ffmpeg/ffmpeg-client';
+import { toast } from 'sonner';
+
+const COLOR_PRESET_LIST = Object.values(COLOR_PRESETS);
+const CAPTION_STYLES = Object.entries(CAPTION_PRESETS);
+
+export function AIControls() {
+  const userClips = useEditorStore((s) => s.userClips);
+  const styleSignature = useEditorStore((s) => s.styleSignature);
+  const refBeats = useEditorStore((s) => s.refBeats);
+  const refVisuals = useEditorStore((s) => s.refVisuals);
+  const setSegments = useEditorStore((s) => s.setSegments);
+  const setTimelineDuration = useEditorStore((s) => s.setTimelineDuration);
+  const segments = useEditorStore((s) => s.segments);
+  const enableCaptions = useEditorStore((s) => s.enableCaptions);
+  const setEnableCaptions = useEditorStore((s) => s.setEnableCaptions);
+  const captionStyle = useEditorStore((s) => s.captionStyle);
+  const setCaptionStyle = useEditorStore((s) => s.setCaptionStyle);
+  const colorPreset = useEditorStore((s) => s.colorPreset);
+  const setColorPreset = useEditorStore((s) => s.setColorPreset);
+  const zoomPunches = useEditorStore((s) => s.zoomPunches);
+  const setZoomPunches = useEditorStore((s) => s.setZoomPunches);
+  const beatSync = useEditorStore((s) => s.beatSync);
+  const setBeatSync = useEditorStore((s) => s.setBeatSync);
+  const isExporting = useEditorStore((s) => s.isExporting);
+  const setIsExporting = useEditorStore((s) => s.setIsExporting);
+  const setExportProgress = useEditorStore((s) => s.setExportProgress);
+  const exportProgress = useEditorStore((s) => s.exportProgress);
+
+  const [generating, setGenerating] = useState(false);
+
+  async function handleGenerate() {
+    if (userClips.length === 0) {
+      toast.error('Upload at least one clip first');
+      return;
+    }
+    if (!styleSignature) {
+      toast.error('Analyze a reference first');
+      return;
+    }
+    setGenerating(true);
+    try {
+      // Use beat-sync captions fallback
+      const captions = {
+        words: styleSignature.beats.map((t, i) => ({
+          text: i % 4 === 0 ? 'Viral' : '·',
+          start: t,
+          end: t + 0.5,
+          highlight: true,
+        })),
+        rawTranscript: '',
+        source: 'energy' as const,
+      };
+      const newSegments = generateAutoEdit({
+        userClips,
+        style: styleSignature,
+        beats: refBeats,
+        visuals: refVisuals,
+        captions: enableCaptions ? captions : null,
+        options: {
+          enableZoomPunches: zoomPunches,
+          enableBeatSync: beatSync,
+        },
+      });
+      // Apply chosen color preset
+      if (colorPreset !== 'none') {
+        for (const seg of newSegments) seg.colorFilter = colorPreset;
+      }
+      setSegments(newSegments);
+      const dur = newSegments.reduce((a, b) => Math.max(a, b.timelineEnd), 0);
+      setTimelineDuration(dur);
+      toast.success(`Generated ${newSegments.length} segments`, {
+        description: `Timeline: ${dur.toFixed(1)}s`,
+      });
+    } catch (err) {
+      toast.error('Generation failed', { description: (err as Error).message });
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function handleExport() {
+    if (segments.length === 0) {
+      toast.error('Generate an edit first');
+      return;
+    }
+    setIsExporting(true);
+    setExportProgress(0);
+    try {
+      const blob = await exportProject(
+        segments,
+        userClips,
+        '',
+        720,
+        1280,
+        undefined,
+        (p) => setExportProgress(p),
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `viral-edit-${Date.now()}.mp4`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success('Exported!', { description: `${(blob.size / 1024 / 1024).toFixed(1)} MB` });
+    } catch (err) {
+      console.error(err);
+      toast.error('Export failed', { description: (err as Error).message });
+    } finally {
+      setIsExporting(false);
+      setExportProgress(0);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Big generate button */}
+      <Button
+        variant="primary"
+        size="lg"
+        className="w-full"
+        onClick={handleGenerate}
+        disabled={generating || userClips.length === 0 || !styleSignature}
+      >
+        {generating ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Sparkles className="h-4 w-4" />
+        )}
+        Generate Edit
+      </Button>
+
+      <Button
+        variant="default"
+        size="lg"
+        className="w-full"
+        onClick={handleExport}
+        disabled={isExporting || segments.length === 0}
+      >
+        {isExporting ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Exporting… {Math.round(exportProgress * 100)}%
+          </>
+        ) : (
+          <>
+            <Download className="h-4 w-4" />
+            Export MP4
+          </>
+        )}
+      </Button>
+
+      {isExporting && (
+        <div className="h-1 rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-full bg-foreground transition-all"
+            style={{ width: `${exportProgress * 100}%` }}
+          />
+        </div>
+      )}
+
+      {/* Color presets */}
+      <div>
+        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-2 px-1">
+          <Palette className="h-3 w-3" />
+          Color
+        </div>
+        <div className="grid grid-cols-4 gap-1.5">
+          {COLOR_PRESET_LIST.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setColorPreset(p.id as any)}
+              className={cn(
+                'h-10 rounded-xl border transition-all',
+                colorPreset === p.id
+                  ? 'border-foreground ring-2 ring-foreground/20'
+                  : 'border-border/60 hover:border-foreground/30',
+              )}
+              style={{ background: p.swatch }}
+              title={p.label}
+            />
+          ))}
+        </div>
+        <div className="text-[10px] text-muted-foreground mt-1.5 text-center">
+          {COLOR_PRESETS[colorPreset]?.label}
+        </div>
+      </div>
+
+      {/* Caption style */}
+      <div>
+        <div className="flex items-center justify-between mb-2 px-1">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Type className="h-3 w-3" />
+            Captions
+          </div>
+          <Switch checked={enableCaptions} onCheckedChange={setEnableCaptions} />
+        </div>
+        {enableCaptions && (
+          <div className="grid grid-cols-4 gap-1.5">
+            <button
+              onClick={() => setCaptionStyle('none')}
+              className={cn(
+                'h-8 rounded-lg text-xs font-medium border transition-colors',
+                captionStyle === 'none'
+                  ? 'border-foreground bg-foreground text-background'
+                  : 'border-border/60 hover:bg-muted',
+              )}
+            >
+              Off
+            </button>
+            {CAPTION_STYLES.map(([key, p]) => (
+              <button
+                key={key}
+                onClick={() => setCaptionStyle(key as any)}
+                className={cn(
+                  'h-8 rounded-lg text-xs font-medium border transition-colors',
+                  captionStyle === key
+                    ? 'border-foreground bg-foreground text-background'
+                    : 'border-border/60 hover:bg-muted',
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Toggles */}
+      <div className="space-y-2">
+        <Toggle
+          icon={<Zap className="h-3 w-3" />}
+          label="Zoom punches"
+          desc="Punch-in on every beat"
+          checked={zoomPunches}
+          onChange={setZoomPunches}
+        />
+        <Toggle
+          icon={<Music className="h-3 w-3" />}
+          label="Beat sync"
+          desc="Cut on every detected beat"
+          checked={beatSync}
+          onChange={setBeatSync}
+        />
+      </div>
+    </div>
+  );
+}
+
+function Toggle({
+  icon,
+  label,
+  desc,
+  checked,
+  onChange,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  desc: string;
+  checked: boolean;
+  onChange: (b: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-2xl border border-border/40 bg-card/50 p-3">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div className="h-7 w-7 rounded-lg bg-muted flex items-center justify-center shrink-0">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm font-medium">{label}</div>
+          <div className="text-[11px] text-muted-foreground truncate">{desc}</div>
+        </div>
+      </div>
+      <Switch checked={checked} onCheckedChange={onChange} />
+    </div>
+  );
+}
