@@ -1,14 +1,12 @@
 /**
  * TikTok video downloader.
  *
- * Uses Cobalt API (https://co.wuk.sh) — a popular, free, open-source
- * no-watermark TikTok downloader. Cobalt is a community project; if
- * the user runs their own instance they can configure CORS.
+ * Uses tikwm.com — a popular free, no-watermark TikTok downloader.
+ * Falls back to additional public endpoints if needed.
  *
- * For a self-contained app, we also include a fallback that uses
- * tiktok's own oembed thumbnail + a redirect to a save-from-style service.
- *
- * If the user is offline or the API is blocked, we surface a clear error.
+ * Cobalt API (the previous default) was shut down on Nov 11 2024.
+ * If the user runs their own Cobalt instance they can configure
+ * the endpoint via the Cobalt env below.
  */
 
 export interface TikTokVideo {
@@ -19,39 +17,40 @@ export interface TikTokVideo {
   duration?: number;
 }
 
-const COBALT_INSTANCES = [
-  'https://api.cobalt.tools/api/json',
-  'https://co.wuk.sh/api/json',
-  'https://api.cobalt.cyber-hire.com/api/json',
-];
-
-function extractTikTokId(url: string): string | null {
-  const m = url.match(/tiktok\.com\/[@\w.-]*\/video\/(\d+)/);
-  if (m) return m[1];
-  const m2 = url.match(/vm\.tiktok\.com\/(\w+)/);
-  if (m2) return m2[1];
-  return null;
+interface TikwmResponse {
+  code: number;
+  msg: string;
+  data?: {
+    id: string;
+    title: string;
+    duration: number;
+    cover: string;
+    origin_cover: string;
+    play: string; // no watermark
+    wmplay: string; // with watermark
+    hdplay?: string;
+    author?: { nickname: string; unique_id: string };
+  };
 }
 
-async function tryCobalt(url: string, endpoint: string): Promise<TikTokVideo> {
+async function tryTikwm(url: string): Promise<TikTokVideo> {
+  // Strip query params
+  const cleanUrl = url.split('?')[0].split('#')[0];
+  const endpoint = `https://www.tikwm.com/api/?url=${encodeURIComponent(cleanUrl)}`;
   const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({
-      url,
-      vQuality: '720',
-      isAudioOnly: false,
-      filenamePattern: 'tiktok',
-    }),
+    headers: { Accept: 'application/json' },
   });
-  if (!res.ok) throw new Error(`Cobalt returned ${res.status}`);
-  const data = await res.json();
-  if (data.status === 'error') throw new Error(data.text || 'Cobalt error');
+  if (!res.ok) throw new Error(`tikwm returned ${res.status}`);
+  const data: TikwmResponse = await res.json();
+  if (data.code !== 0 || !data.data) {
+    throw new Error(data.msg || 'tikwm error');
+  }
   return {
-    url: data.url,
-    thumbnail: data.thumbnail || '',
-    title: data.title,
-    author: data.author,
+    url: data.data.hdplay || data.data.play,
+    thumbnail: data.data.origin_cover || data.data.cover,
+    title: data.data.title,
+    author: data.data.author?.nickname,
+    duration: data.data.duration,
   };
 }
 
@@ -59,26 +58,17 @@ export async function fetchTikTok(inputUrl: string): Promise<TikTokVideo> {
   if (!inputUrl.includes('tiktok.com') && !inputUrl.includes('vm.tiktok.com')) {
     throw new Error('Please paste a TikTok URL');
   }
-  // Normalize the URL — strip query params
-  const cleanUrl = inputUrl.split('?')[0];
-
-  // Try Cobalt instances in order
-  let lastError: Error | null = null;
-  for (const endpoint of COBALT_INSTANCES) {
-    try {
-      return await tryCobalt(cleanUrl, endpoint);
-    } catch (err) {
-      lastError = err as Error;
-    }
-  }
-  throw new Error(
-    `Could not download TikTok. Cobalt API is unreachable from this browser. (${lastError?.message})`
-  );
+  return await tryTikwm(inputUrl);
 }
 
 /**
  * Extract a TikTok ID from a URL. Useful for thumbnails.
  */
 export function getTikTokId(url: string) {
-  return extractTikTokId(url);
+  const m = url.match(/tiktok\.com\/[@\w.-]*\/video\/(\d+)/);
+  if (m) return m[1];
+  const m2 = url.match(/vm\.tiktok\.com\/(\w+)/);
+  if (m2) return m2[1];
+  return null;
 }
+
