@@ -14,12 +14,14 @@ import {
   Play,
   Loader2,
   AlertCircle,
-  Check,
+  Youtube,
+  Terminal,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useEditorStore } from '@/store/editor-store';
-import { fetchTikTok } from '@/lib/tiktok/downloader';
+import { fetchVideo, detectSource } from '@/lib/tiktok/downloader';
 import { decodeMedia } from '@/lib/ai/extract-frames';
 import { analyzeVideoStyle } from '@/lib/ai/style';
 import { useRouter } from 'next/navigation';
@@ -52,10 +54,15 @@ const FEATURES = [
 ];
 
 const STEPS = [
-  { n: '01', title: 'Paste a TikTok URL', desc: 'Or drop in your own reference clip.' },
+  { n: '01', title: 'Paste a TikTok URL', desc: 'Or drop in any video file as reference.' },
   { n: '02', title: 'AI analyzes the style', desc: 'Beats, color, motion, cut rhythm.' },
-  { n: '03', title: 'Upload your clips', desc: 'The AI edits them in the same style.' },
+  { n: '03', title: 'Upload your clips', desc: 'The reference is included automatically — remix away.' },
   { n: '04', title: 'Tweak & export', desc: 'Fine-tune on the timeline, then save as MP4.' },
+];
+
+const URL_EXAMPLES = [
+  { label: 'TikTok', url: 'https://www.tiktok.com/@scout2015/video/6718335390845095173', icon: '🎵' },
+  { label: 'TikTok', url: 'https://www.tiktok.com/@orangieuncensored/video/7473938413725502762', icon: '🐸' },
 ];
 
 export function LandingPage() {
@@ -76,8 +83,14 @@ export function LandingPage() {
   const setAnalyzing = useEditorStore((s) => s.setAnalyzing);
   const setAnalysisProgress = useEditorStore((s) => s.setAnalysisProgress);
   const userClips = useEditorStore((s) => s.userClips);
+  const addUserClip = useEditorStore((s) => s.addUserClip);
+  const reset = useEditorStore((s) => s.reset);
 
-  async function handleAnalyzeClip(blob: Blob, name: string, type: 'tiktok' | 'upload') {
+  // Detect URL type as user types, show a hint
+  const detected = url.trim() ? detectSource(url.trim()) : null;
+  const isYouTube = detected?.kind === 'youtube';
+
+  async function handleAnalyzeClip(blob: Blob, name: string, source: 'tiktok' | 'upload' | 'direct') {
     try {
       setIsLoading(true);
       setError(null);
@@ -92,7 +105,6 @@ export function LandingPage() {
       // Generate thumbnail from first frame
       const thumbCanvas = document.createElement('canvas');
       thumbCanvas.width = 320;
-      thumbCanvas.height = 320;
       const aspect = decoded.width / decoded.height;
       if (aspect > 1) {
         thumbCanvas.width = 320;
@@ -118,23 +130,28 @@ export function LandingPage() {
         thumbnail: thumb,
       };
       setReferenceClip(clip);
-      if (type === 'tiktok') setReferenceThumbnail(thumb);
+      if (source === 'tiktok') setReferenceThumbnail(thumb);
 
       setAnalysisProgress('Analyzing style…');
       const { style, beats, visuals } = await analyzeVideoStyle(
         decoded.frames,
         decoded.audio,
-        type === 'tiktok' ? 'tiktok' : 'reference',
+        source === 'tiktok' ? 'tiktok' : 'reference',
         {
-          onProgress: (s, p) => setAnalysisProgress(s),
+          onProgress: (s) => setAnalysisProgress(s),
         }
       );
       setStyleSignature(style);
       setRefBeats(beats);
       setRefVisuals(visuals);
 
+      // Auto-include the reference in the clip library so the user can
+      // remix it with their other clips. They can remove it from the
+      // editor's clip library if they don't want it included.
+      addUserClip(clip);
+
       toast.success('Style analyzed!', {
-        description: `${style.bpm} BPM • ${style.cutsPerMinute.toFixed(0)} cuts/min • ${style.colorPalette.length} colors`,
+        description: `${style.bpm || '—'} BPM • ${style.cutsPerMinute.toFixed(0)} cuts/min • ${style.colorPalette.length} colors`,
       });
       setAnalyzing(false);
       setAnalysisProgress('');
@@ -152,23 +169,24 @@ export function LandingPage() {
     }
   }
 
-  async function handleTikTok() {
+  async function handleAnalyzeUrl() {
     if (!url.trim()) return;
     try {
       setIsLoading(true);
       setError(null);
       setStep('downloading');
-      setProgressMsg('Downloading from TikTok…');
-      const tt = await fetchTikTok(url.trim());
+      setProgressMsg('Downloading video…');
+      const fetched = await fetchVideo(url.trim());
       setProgressMsg('Fetching video file…');
-      const res = await fetch(tt.url);
-      if (!res.ok) throw new Error('Failed to fetch video file');
+      const res = await fetch(fetched.url);
+      if (!res.ok) throw new Error(`Failed to fetch video file (HTTP ${res.status})`);
       const blob = await res.blob();
-      const title = tt.title || 'TikTok reference';
+      const title = fetched.title || `${fetched.source} reference`;
       await handleAnalyzeClip(blob, title, 'tiktok');
     } catch (err) {
-      setError((err as Error).message);
-      toast.error('Could not download', { description: (err as Error).message });
+      const msg = (err as Error).message;
+      setError(msg);
+      toast.error('Could not download', { description: msg });
       setIsLoading(false);
       setStep('idle');
     }
@@ -290,22 +308,71 @@ export function LandingPage() {
                   className="p-6 md:p-8 space-y-5"
                 >
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      TikTok URL
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Video URL
+                      </label>
+                      {detected && (
+                        <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground bg-muted/60 rounded-full px-2 py-0.5">
+                          {detected.kind}
+                        </span>
+                      )}
+                    </div>
                     <div className="mt-2 relative">
-                      <Link2 className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      {isYouTube ? (
+                        <Youtube className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-red-500" />
+                      ) : (
+                        <Link2 className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      )}
                       <Input
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
                         onFocus={() => setUrlFocused(true)}
                         onBlur={() => setUrlFocused(false)}
-                        placeholder="https://www.tiktok.com/@user/video/..."
+                        placeholder="TikTok, Twitter/X, or direct .mp4 link"
                         className="pl-11 h-12 text-base"
-                        onKeyDown={(e) => e.key === 'Enter' && handleTikTok()}
+                        onKeyDown={(e) => e.key === 'Enter' && !isYouTube && handleAnalyzeUrl()}
                         disabled={isWorking}
                       />
                     </div>
+                    {isYouTube ? (
+                      <div className="mt-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                          <div className="space-y-1.5">
+                            <p className="text-foreground/90 font-medium">
+                              YouTube blocked all public download APIs in 2024.
+                            </p>
+                            <p className="text-muted-foreground">
+                              Download the video locally with{' '}
+                              <code className="px-1.5 py-0.5 rounded bg-muted text-foreground/90 font-mono text-[11px]">
+                                yt-dlp
+                              </code>{' '}
+                              and upload the .mp4 below:
+                            </p>
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <Terminal className="h-3 w-3 text-muted-foreground" />
+                              <code className="font-mono text-[11px] text-foreground/80 bg-background/60 rounded px-2 py-1 flex-1 overflow-x-auto">
+                                yt-dlp &quot;{url.trim().slice(0, 60)}{url.trim().length > 60 ? '…' : ''}&quot;
+                              </code>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] text-muted-foreground">Try:</span>
+                        {URL_EXAMPLES.map((ex) => (
+                          <button
+                            key={ex.url}
+                            onClick={() => setUrl(ex.url)}
+                            className="text-[11px] text-foreground/70 hover:text-foreground transition-colors bg-muted/40 hover:bg-muted/60 rounded-full px-2.5 py-0.5"
+                          >
+                            {ex.icon} {ex.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="h-px flex-1 bg-border" />
@@ -337,18 +404,18 @@ export function LandingPage() {
                   {error && (
                     <div className="flex items-start gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 p-3 text-sm">
                       <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                      <p className="text-destructive/90">{error}</p>
+                      <p className="text-destructive/90 whitespace-pre-line">{error}</p>
                     </div>
                   )}
                   <Button
                     variant="primary"
                     size="xl"
                     className="w-full"
-                    onClick={handleTikTok}
-                    disabled={!url.trim() || isWorking}
+                    onClick={handleAnalyzeUrl}
+                    disabled={!url.trim() || isWorking || isYouTube}
                   >
                     <Sparkles className="h-4 w-4" />
-                    Analyze & Edit
+                    {isYouTube ? 'YouTube needs manual download' : 'Analyze & Edit'}
                   </Button>
                 </motion.div>
               )}
@@ -450,7 +517,7 @@ export function LandingPage() {
               Get started
             </Button>
             <Link
-              href="https://github.com"
+              href="https://github.com/tikt05081/viral-ai-editor"
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"

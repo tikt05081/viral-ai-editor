@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, X, Film, Plus, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Upload, X, Film, Plus, Loader2, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { useEditorStore } from '@/store/editor-store';
 import { Button } from '@/components/ui/button';
 import { cn, formatTime, formatBytes } from '@/lib/utils';
@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 
 export function ClipsLibrary() {
   const userClips = useEditorStore((s) => s.userClips);
+  const referenceClip = useEditorStore((s) => s.referenceClip);
   const addUserClip = useEditorStore((s) => s.addUserClip);
   const removeUserClip = useEditorStore((s) => s.removeUserClip);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -125,7 +126,9 @@ export function ClipsLibrary() {
               </div>
             )}
             <AnimatePresence>
-              {userClips.map((clip) => (
+              {userClips.map((clip) => {
+                const isReference = referenceClip?.id === clip.id;
+                return (
                 <motion.div
                   key={clip.id}
                   initial={{ opacity: 0, scale: 0.9 }}
@@ -133,6 +136,12 @@ export function ClipsLibrary() {
                   exit={{ opacity: 0, scale: 0.9 }}
                   className="group relative aspect-[9/16] rounded-2xl overflow-hidden border border-border/60 bg-muted/40 apple-shadow"
                 >
+                  {isReference && (
+                    <div className="absolute top-1.5 left-1.5 z-10 inline-flex items-center gap-1 bg-foreground/90 text-background text-[9px] font-semibold uppercase tracking-wider rounded-full px-2 py-0.5">
+                      <Sparkles className="h-2.5 w-2.5" />
+                      Ref
+                    </div>
+                  )}
                   {clip.thumbnail ? (
                     <img src={clip.thumbnail} alt="" className="w-full h-full object-cover" />
                   ) : (
@@ -151,12 +160,13 @@ export function ClipsLibrary() {
                   </div>
                   <button
                     onClick={() => removeUserClip(clip.id)}
-                    className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10"
                   >
                     <X className="h-3 w-3" />
                   </button>
                 </motion.div>
-              ))}
+              );
+              })}
             </AnimatePresence>
           </div>
         )}
